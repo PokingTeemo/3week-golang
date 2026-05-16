@@ -9,18 +9,88 @@ import (
 )
 
 type User struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-	Age  int    `json:"age"`
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Age   int    `json:"age"`
+	Email string `json:"email"`
 }
 
 type userRequest struct {
-	Name string `json:"name"`
-	Age  int    `json:"age"`
+	Name  string `json:"name"`
+	Age   int    `json:"age"`
+	Email string `json:"email"`
 }
 
-var users = []User{}
-var nextID = 1
+type Store struct {
+	users  []User
+	nextID int
+}
+
+func NewStore() *Store {
+	return &Store{nextID: 1}
+}
+
+func (s *Store) GetAll(minAge int) []User {
+	if minAge <= 0 {
+		return s.users
+	}
+	var result []User
+	for _, u := range s.users {
+		if u.Age >= minAge {
+			result = append(result, u)
+		}
+	}
+	if result == nil {
+		result = []User{}
+	}
+	return result
+}
+
+func (s *Store) GetByID(id int) (User, bool) {
+	for _, u := range s.users {
+		if u.ID == id {
+			return u, true
+		}
+	}
+	return User{}, false
+}
+
+func (s *Store) Create(req userRequest) User {
+	u := User{
+		ID:    s.nextID,
+		Name:  req.Name,
+		Age:   req.Age,
+		Email: req.Email,
+	}
+	s.nextID++
+	s.users = append(s.users, u)
+	return u
+}
+
+func (s *Store) Update(id int, req userRequest) (User, bool) {
+	for i := range s.users {
+		if s.users[i].ID == id {
+			s.users[i].Name = req.Name
+			s.users[i].Age = req.Age
+			s.users[i].Email = req.Email
+			return s.users[i], true
+		}
+	}
+	return User{}, false
+}
+
+func (s *Store) Delete(id int) (User, bool) {
+	for i := range s.users {
+		if s.users[i].ID == id {
+			deleted := s.users[i]
+			s.users = append(s.users[:i], s.users[i+1:]...)
+			return deleted, true
+		}
+	}
+	return User{}, false
+}
+
+var store = NewStore()
 
 func main() {
 	http.HandleFunc("/users", usersHandler)
@@ -35,7 +105,7 @@ func main() {
 func usersHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		getUsers(w)
+		getUsers(w, r)
 	case http.MethodPost:
 		createUser(w, r)
 	default:
@@ -62,19 +132,26 @@ func userByIDHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getUsers(w http.ResponseWriter) {
-	writeJSON(w, http.StatusOK, users)
+func getUsers(w http.ResponseWriter, r *http.Request) {
+	minAge := 0
+	if v := r.URL.Query().Get("minAge"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil || parsed < 0 {
+			writeError(w, http.StatusBadRequest, "invalid minAge")
+			return
+		}
+		minAge = parsed
+	}
+	writeJSON(w, http.StatusOK, store.GetAll(minAge))
 }
 
 func getUser(w http.ResponseWriter, id int) {
-	for _, user := range users {
-		if user.ID == id {
-			writeJSON(w, http.StatusOK, user)
-			return
-		}
+	user, ok := store.GetByID(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
 	}
-
-	writeError(w, http.StatusNotFound, "user not found")
+	writeJSON(w, http.StatusOK, user)
 }
 
 func createUser(w http.ResponseWriter, r *http.Request) {
@@ -82,16 +159,7 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
-	user := User{
-		ID:   nextID,
-		Name: req.Name,
-		Age:  req.Age,
-	}
-	nextID++
-	users = append(users, user)
-
-	writeJSON(w, http.StatusCreated, user)
+	writeJSON(w, http.StatusCreated, store.Create(req))
 }
 
 func updateUser(w http.ResponseWriter, r *http.Request, id int) {
@@ -99,30 +167,21 @@ func updateUser(w http.ResponseWriter, r *http.Request, id int) {
 	if !ok {
 		return
 	}
-
-	for i := range users {
-		if users[i].ID == id {
-			users[i].Name = req.Name
-			users[i].Age = req.Age
-			writeJSON(w, http.StatusOK, users[i])
-			return
-		}
+	user, ok := store.Update(id, req)
+	if !ok {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
 	}
-
-	writeError(w, http.StatusNotFound, "user not found")
+	writeJSON(w, http.StatusOK, user)
 }
 
 func deleteUser(w http.ResponseWriter, id int) {
-	for i := range users {
-		if users[i].ID == id {
-			deleted := users[i]
-			users = append(users[:i], users[i+1:]...)
-			writeJSON(w, http.StatusOK, deleted)
-			return
-		}
+	deleted, ok := store.Delete(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
 	}
-
-	writeError(w, http.StatusNotFound, "user not found")
+	writeJSON(w, http.StatusOK, deleted)
 }
 
 func decodeUserRequest(w http.ResponseWriter, r *http.Request) (userRequest, bool) {

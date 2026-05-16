@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+func add(a, b int) int {
+	return a + b
+}
+
 func greet(name string) string {
 	return "안녕하세요, " + name + "님!"
 }
@@ -18,6 +22,10 @@ func divide(a, b float64) (float64, error) {
 
 func main() {
 	fmt.Println(greet("Alice"))
+
+	sum := add(3, 7)
+	fmt.Println("3 + 7 =", sum)
+
 
 	result, err := divide(10, 3)
 	if err != nil {

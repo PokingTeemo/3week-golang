@@ -18,6 +18,7 @@ func main() {
 		"Bob":   75,
 	}
 	scores["Carol"] = 88
+	scores["나"] = 95
 
 	aliceScore, ok := scores["Alice"]
 	if ok {
@@ -27,4 +28,11 @@ func main() {
 	for name, score := range scores {
 		fmt.Printf("%s: %d점\n", name, score)
 	}
+
+	total := 0
+	for _, score := range scores {
+		total += score
+	}
+	avg := float64(total) / float64(len(scores))
+	fmt.Printf("전체 평균 점수: %.2f\n", avg)
 }

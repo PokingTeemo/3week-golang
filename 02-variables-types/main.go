@@ -20,4 +20,12 @@ func main() {
 
 	fmt.Printf("type of score: %T\n", score)
 	fmt.Printf("score with one decimal place: %.1f\n", score)
+
+	height := 175.5
+	email := "alice@example.com"
+	isAdmin := false
+
+	fmt.Printf("height: %.1f\n", height)
+	fmt.Println("email:", email)
+	fmt.Println("isAdmin:", isAdmin)
 }
